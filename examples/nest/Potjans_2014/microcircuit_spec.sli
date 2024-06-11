@@ -39,14 +39,15 @@
 
     Please see the file README.txt for details.
 
-    microcircuit_spec.sli: Version modified for SPAC CPU benchmark
-    			   - Number of threads can be set on command line
-			   - Model scale can be set on command line
-			   - Recording to memory only, can be turned off entirely
-			   - Random seed can be set
-			   - Total spike count, timers and som more stats reported at end
-			   - Entirely self-contained, does not depend on external files
-			   - Assumes being run on a single MPI process
+    microcircuit_spec.sli: Version modified for SPEC CPU benchmark
+    	 - Number of threads can be set on command line
+	 - Model scale can be set on command line
+	 - Recording to memory only, can be turned off entirely
+	 - Random seed can be set
+	 - Total spike count, timers and som more stats reported at end
+	 - Entirely self-contained, does not depend on external files
+	 - Assumes being run on a single MPI process
+	 - Code for thalamic input, DC input and "optimized" randomization removed
 
     Configuration via colon-separated user arguments, where all arguments are optional
 
@@ -65,10 +66,10 @@
     Note: Expected value for "Total spikes" depends on scale. The table shows results observed
           for different random seed values (one value only for scale 1):
 
-          Scale 0.1:   31562   30572   29754
-	  Scale 0.2:   56191   55304   56539
-	  Scale 0.4:  111171  110704  108957
-	  Scale 1.0:  270416
+          Scale 0.1:   30259   31039   30523
+	  Scale 0.2:   56532   57998   57597
+	  Scale 0.4:  110689  110406  109922
+	  Scale 1.0:  270442
 
 	  Changing the number of threads for fixed scale will lead to changes in "Total spikes" comparable
 	  to the differences observed for different seeds, since random numbers are distributed differently.
@@ -81,7 +82,7 @@
 
 	      Blanco, W., Lopes, P. H., De S. Souza, A. A., & Mascagni, M. (2020).
 	      Non-replicability circumstances in a neural network model with Hodgkin-Huxley-type neurons.
-	      Journal of Computational Neuroscience, 48(3), 357–363. https://doi.org/10.1007/s10827-020-00748-3
+	      Journal of Computational Neuroscience, 48(3), 357-363. https://doi.org/10.1007/s10827-020-00748-3
 
 */
 
@@ -105,10 +106,6 @@
 /t_sim 1000.0 def
 /dt 0.1 def
 
-% By default, record all spikes in simulation, reporting only counts per area at the end
-% Set to e.g., /max_rec_spikes 100 def to record at most from 100 neurons per area
-/max_rec_spikes 80000 scale mul cvi def
-
 statusdict /userargs get { (=) breakup } Map
 {
  arrayload ;
@@ -124,6 +121,9 @@ statusdict /userargs get { (=) breakup } Map
 }
 forall
 
+% By default, record all spikes in simulation, reporting only counts per area at the end
+% Set to e.g., /max_rec_spikes 100 def to record at most from 100 neurons per area
+/max_rec_spikes 80000 scale mul cvi def
 
 
 % CheckParameters - This function performs a (non-exhaustive) check of
@@ -144,28 +144,6 @@ forall
            (. Script is tuned to /iaf_psc_exp neurons.) join
            message
 	} if
-    } if
-
-    /vm0_type_options <(original) (optimized)> def
-    Vm0_type (original) eq not
-    {
-        Vm0_type (optimized) eq not
-        {
-
-           M_WARNING (CheckParameters)
-           (') Vm0_type join
-           (' is not a valid option, replacing it with ') join
-           vm0_type_options 0 get join
-           ('; Valid options are ') join
-           vm0_type_options 0 get join
-           (' and ') join
-           vm0_type_options 1 get join
-           (') join
-           message
-
-           % reset variable to (original)
-           /Vm0_type vm0_type_options 0 get def
-        } if
     } if
 
     /n_layers full_scale_n_neurons length def
@@ -201,7 +179,7 @@ forall
     <<
        /resolution dt
        /local_num_threads n_threads
-       /overwrite_files false
+       /overwrite_files true
        /rng_seed rng_seed
     >> SetKernelStatus
 } def
@@ -254,7 +232,6 @@ forall
 
     % standard deviations of delays
     /delays_sd delays delay_rel_sd mul def
-    /delay_th_sd delay_th delay_th_rel_sd mul def
 
     /n_neurons_rec_spikes
     full_scale_n_neurons { { area mul cvi max_rec_spikes min } Map } Map
@@ -266,11 +243,7 @@ forall
 % the following variables are created here:
 % neuron_nodeIDs
 % poisson_nodeIDs
-% dc_generator_nodeIDs
 % spike_recorder_nodeIDs
-% th_neuron_nodeIDs
-% th_poisson_nodeID
-% th_spike_recorder_nodeID
 /CreateNetworkNodes
 {
     neuron_model model_params SetDefaults
@@ -278,7 +251,6 @@ forall
     /neuron_nodeIDs         [n_layers n_pops_per_layer] 0 LayoutArray def
     record { /spike_recorder_nodeIDs [n_layers n_pops_per_layer] 0 LayoutArray def } if
     /poisson_nodeIDs        [n_layers n_pops_per_layer] 0 LayoutArray def
-    /dc_generator_nodeIDs   [n_layers n_pops_per_layer] 0 LayoutArray def
 
     0 1 n_layers 1 sub {
         /layer_index Set
@@ -297,24 +269,10 @@ forall
 
             % initialize membrane potentials
             population {
-               Vm0_type (optimized) eq
-               {
-                   <<
-                      /V_m
-                      << /normal
-                        <<
-                          /mean Vm0_mean layer_index get population_index get
-                          /std Vm0_std layer_index get population_index get
-                        >>
-                      >> CreateParameter
-
-                   >>
-               }{
-                   <<
-                      /V_m
-                      << /normal << /mean Vm0_mean /std Vm0_std >> >> CreateParameter
-                   >>
-               } ifelse
+               <<
+                  /V_m
+                  << /normal << /mean Vm0_mean /std Vm0_std >> >> CreateParameter
+               >>
                SetStatus
 	    } forall
 
@@ -332,29 +290,8 @@ forall
 	       /rate K_bg_ bg_rate mul
             >> Create put /poisson_nodeIDs Set
 
-	    dc_generator_nodeIDs [layer_index population_index] /dc_generator <<
-	       /amplitude K_bg_ dc_amplitude mul
-	    >>  Create put /dc_generator_nodeIDs Set
-
         } for % loop over e and i populations
     } for % loop over layers
-
-    % create and configure thalamic neurons (parrots) and their Poisson inputs
-    n_thal 0 gt {
-        /parrot_neuron n_thal Create /th_neuron_nodeIDs Set
-
-	/poisson_generator <<
-           /rate th_rate
-           /start th_start
-           /stop th_start th_duration add
-        >> Create /th_poisson_nodeID Set
-
-        record {
-            /spike_recorder Create <<
-	       /record_to /memory
-	    >> /th_spike_recorder_nodeID Set
-        } if
-    } if
 } def
 
 
@@ -364,8 +301,6 @@ forall
 %
 /ConnectNetworkNodes
 {
-    tic
-
     0 1 n_layers 1 sub { % target layer
         /target_layer Set
 
@@ -447,48 +382,6 @@ forall
 	        } for % source population
 	    } for % source layer
 
-            n_thal 0 gt
-            {
-                % connections from thalamic neurons
-
-                C_th target_layer get target_pop get /conn_prob Set
-
-                % Compute numbers of synapses assuming binomial degree
-                % distributions and allowing for multapses (see Potjans and
-                % Diesmann 2012 Cereb Cortex Eq. 1)
-                preserve_K {
-                    /prod n_thal full_scale_n_targets mul def
-                    ( log(1.-conn_prob)/log((prod-1.)/prod) ) ExecMath /n_syn_temp Set
-                    n_syn_temp n_targets mul full_scale_n_targets div
-                }{
-                    /prod n_thal n_targets mul def
-                    ( log(1.-conn_prob)/log((prod-1.)/prod) ) ExecMath
-                } ifelse
-                cvi /n_synapses Set
-
-                n_synapses 0 gt {
-                    % insert the weight Parameter into the synapse dictionary
-                    syn_dict /weight
-                    << /normal << /mean PSC_ext /std PSC_th_sd abs >> >> CreateParameter
-                    0.0 (inf) cvd redraw
-                    put
-
-                    % insert the delay dictionary into the synapse dictionary
-                    syn_dict /delay
-                    << /normal << /mean delay_th /std delay_th_sd abs >> >> CreateParameter
-                    0.05 (inf) cvd redraw
-                    put
-
-		    % fill the connectivity dictionary with the number of synapses to be used
-                    conn_dict /N n_synapses put
-                    conn_dict /rule /fixed_total_number put
-
-                    % Connect the thalamus
-                    th_neuron_nodeIDs target_nodes conn_dict syn_dict Connect
-
-                } if % n_synapses > 0
-            } if % n_thal > 0
-
             % Connect devices
 
             % Connect to the spike recorder
@@ -507,30 +400,9 @@ forall
             << /weight PSC_ext /delay delays 0 get >>
             Connect
 
-            % Connect to the DC generators
-            dc_generator_nodeIDs target_layer get target_pop get
-            target_nodes
-            /all_to_all
-            Connect
-
         } for % target population
     } for % target layer
 
-    n_thal 0 gt {
-        % Connect thalamic poisson_generator to thalamic neurons (parrots)
-        th_poisson_nodeID 1 arraystore
-        th_neuron_nodeIDs
-        Connect
-    } if
-
-    record n_thal 0 gt and {
-        % Connect thalamic neurons to spike recorder
-        th_neuron_nodeIDs
-        th_spike_recorder_nodeID 1 arraystore
-        Connect
-    } if
-
-    toc /ConnectTime Set
 } def
 
 
@@ -607,37 +479,8 @@ def
 
 % Initial conditions for the membrane potential, options are:
 % (original): uniform mean and std for all populations
-% (optimized): population-specific mean and std, allowing a reduction of the
-% initial activity burst in the network
-/Vm0_type (original) def        % choose either (original) or (optimized)
-Vm0_type (optimized) eq
-{
-    % optimized
-    % mean of initial membrane potential (mV)
-    /Vm0_mean [[-68.28   % 2/3e
-                -63.16]  % 2/3i
-               [-63.33   % 4e
-                -63.45]  % 4i
-               [-63.11   % 5e
-                -61.66]  % 5i
-               [-66.72   % 6e
-                -61.43]] % 6i
-                def
-    % std of initial membrane potential (mV)
-    /Vm0_std  [[5.36     % 2/3e
-                4.57]    % 2/3i
-               [4.74     % 4e
-                4.94]    % 4i
-               [4.94     % 5e
-                4.55]    % 5i
-               [5.46     % 6e
-                4.48]]   % 6i
-                def
-}{
-    % original
-    /Vm0_mean -58.0 def
-    /Vm0_std 10.0 def
-} ifelse
+/Vm0_mean -58.0 def
+/Vm0_std 10.0 def
 
 % neuron model parameters
 /model_params  << /tau_m 10.        % membrane time constant (ms)
@@ -656,9 +499,7 @@ Vm0_type (optimized) eq
 
 % rate of background Poisson input at each external input synapse (spikes/s)
 /bg_rate 8. def
-% DC amplitude at each external input synapse (pA)
-% This is relevant for reproducing Potjans & Diesmann (2012) Fig. 7.
-/dc_amplitude 0. def
+
 % in-degrees for background input
 /K_bg [[1600   % 2/3e
         1500]  % 2/3i
@@ -670,32 +511,7 @@ Vm0_type (optimized) eq
         2100]] % 6i
         def
 
-% optional additional thalamic input (Poisson)
-% Set n_thal to 0 to avoid this input.
-% For producing Potjans & Diesmann (2012) Fig. 10, n_thal=902 was used.
-% Note that the thalamic rate here reproduces the simulation results
-% shown in the paper, and differs from the rate given in the text.
-/n_thal 0 def          % size of thalamic population
-/th_start 700. def     % onset of thalamic input (ms)
-/th_duration 10. def   % duration of thalamic input (ms)
-/th_rate 120. def      % rate of thalamic neurons (spikes/s)
 /PSP_ext 0.15 def      % mean EPSP amplitude (mV) for external input
-
-% connection probabilities for thalamic input
-/C_th [[0.0       % 2/3e
-        0.0   ]   % 2/3i
-       [0.0983    % 4e
-        0.0619]   % 4i
-       [0.0       % 5e
-        0.0   ]   % 5i
-       [0.0512    % 6e
-        0.0196]]  % 6i
-      def
-
-% mean delay of thalamic input (ms)
-/delay_th 1.5 def
-% standard deviation relative to mean delay of thalamic input
-/delay_th_rel_sd 0.5 def
 
 % ===================================================================================
 
@@ -708,7 +524,6 @@ CreateNetworkNodes
 ConnectNetworkNodes
 
 t_sim Simulate
-toc /SimTime Set
 
 (\n-----------------------------) =
 (Simulation report) =
@@ -725,7 +540,9 @@ toc /SimTime Set
 (Population spikes: ) =only
 record
 {
-  spike_recorder_nodeIDs { { /n_events get } Map } Map ==
+  spike_recorder_nodeIDs { { /n_events get } Map } Map
+  dup ==only
+  Flatten 0 exch { add } Fold (, sum: ) =only =
 }
 {
   (---) =
