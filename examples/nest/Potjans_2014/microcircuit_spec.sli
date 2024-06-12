@@ -121,10 +121,6 @@ statusdict /userargs get { (=) breakup } Map
 }
 forall
 
-% By default, record all spikes in simulation, reporting only counts per area at the end
-% Set to e.g., /max_rec_spikes 100 def to record at most from 100 neurons per area
-/max_rec_spikes 80000 scale mul cvi def
-
 
 % CheckParameters - This function performs a (non-exhaustive) check of
 % parameter dimensions and values.
@@ -233,8 +229,7 @@ forall
     % standard deviations of delays
     /delays_sd delays delay_rel_sd mul def
 
-    /n_neurons_rec_spikes
-    full_scale_n_neurons { { area mul cvi max_rec_spikes min } Map } Map
+    /n_neurons_rec_spikes full_scale_n_neurons { { area mul cvi } Map } Map
     def
 
 } def
