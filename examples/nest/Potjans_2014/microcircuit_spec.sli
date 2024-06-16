@@ -103,6 +103,8 @@
 /rng_seed 12345 def
 /record true def
 
+/reportfile (microcircuit_spec.rpt) def
+
 /t_sim 1000.0 def
 /dt 0.1 def
 
@@ -520,32 +522,33 @@ ConnectNetworkNodes
 
 t_sim Simulate
 
-(\n-----------------------------) =
-(Simulation report) =
-(-----------------------------) =
-
 /ks GetKernelStatus def
 
-(Number of threads: ) =only ks /local_num_threads get =
-(Scale            : ) =only scale =
-(Network size     : ) =only ks /network_size get =
-(Num connections  : ) =only ks /num_connections get =
-(Simulated time   : ) =only t_sim =only ( ms) =
-(Total spikes     : ) =only ks /local_spike_counter get =
-(Population spikes: ) =only
+reportfile (w) file
+
+(Number of threads: ) <- ks /local_num_threads get <- endl
+(Scale            : ) <- scale <- endl
+(Network size     : ) <- ks /network_size get <- endl
+(Num connections  : ) <- ks /num_connections get <- endl
+(Simulated time   : ) <- t_sim <- ( ms) <- endl
+(Total spikes     : ) <- ks /local_spike_counter get <- endl
 record
 {
-  spike_recorder_nodeIDs { { /n_events get } Map } Map
-  dup ==only
-  Flatten 0 exch { add } Fold (, sum: ) =only =
+  (Population spikes: ) <-
+  /scnts spike_recorder_nodeIDs { { /n_events get } Map } Map def
+  scnts <--
+  ( ==> Sum: ) <-
+  scnts Flatten 0 exch { add } Fold <- endl
 }
-{
-  (---) =
-}
-ifelse
+if
+
+endl
+(Time create nodes: ) <- ks /time_construction_create get <- ( s) <- endl
+(Time connect     : ) <- ks /time_construction_connect get <- ( s) <- endl
+(Time prepare     : ) <- ks /time_communicate_prepare get <- ( s) <- endl
+(Time simulate    : ) <- ks /time_simulate get <- ( s) <- endl
+
+close
+
+(\nReport written to: ) =only reportfile =
 () =
-(Time create nodes: ) =only ks /time_construction_create get =only ( s)=
-(Time connect     : ) =only ks /time_construction_connect get =only ( s)=
-(Time prepare     : ) =only ks /time_communicate_prepare get =only ( s)=
-(Time simulate    : ) =only ks /time_simulate get =only ( s)=
-(-----------------------------) =
