@@ -1,0 +1,296 @@
+/*
+ *  cuba_stdp_spec.sli
+ *
+ *  This file is part of NEST.
+ *
+ *  Copyright (C) 2004 The NEST Initiative
+ *
+ *  NEST is free software: you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation, either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  NEST is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with NEST.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+% autorun=true
+
+/*
+   The fifth simulator review benchmark is implemented as a variation of the
+      * Brunel Network *
+
+   (from the docu of brunel.sli)
+   The SLI code in this file creates a sparsely coupled network of
+   excitatory and inhibitory neurons.  Connections within and across
+   both populations are created at random.  Both neuron populations
+   receive Poissonian background input.  The spike output of 1000
+   neurons are recorded.  Neurons are modeled as leaky
+   integrate-and-fire neurons with current-injecting synapses
+   (exp functions). Excitatory-excitatory synapses implement
+   multiplicative STDP.
+   Marc-Oliver Gewaltig, Abigail Morrison, Wiebke Potjans, Tobias Potjans
+
+   Usage:
+   This file (cuba_stdp.sli) is used on its own, e.g.
+
+     nest cuba_stdp.sli
+
+   If virtual_processes is set to a value greater than one, the benchmarks can
+   will be run with that number of virtual processes. If you do not use MPI, each
+   virtual process is mapped to one POSIX thread. You should not use more POSIX
+   threads per machine than there are processor cores. If you use MPI, you can
+   run the benchmark in a distributed fashion using mpirun, e.g.
+
+     mpirun -np 2 nest cuba_stdp.sli
+
+   In this case, the number of MPI processes must divide the number of virtual
+   processes without remainder. You could, e.g. use 4 virtual processes on a
+   mini-cluster of 2 machines with 2 CPUs each.
+
+   ----------------------------------------------------------------------
+
+   cuba_stdp_spec.sli: Version modified for SPEC CPU benchmark
+    	 - Number of threads can be set on command line
+	 - Model scale can be set on command line
+	 - Random seed can be set
+	 - Total spike count, timers and som more stats reported in *.rpt file
+	 - Entirely self-contained, does not depend on external files
+	 - Assumes being run on a single MPI process
+	 - No spike recorders, only use local spike counter
+
+    Configuration via colon-separated user arguments, where all arguments are optional
+
+    nest --userargs=threads=T:scale=S:seed=R cuba_stdp_spec.sli
+
+    e.g.
+
+    nest --userargs=threads=4:scale=0.4:seed=12 cuba_stdp_spec.sli
+
+    Note: Because NEST uses bitfields of limited size in spike communication, only about
+          134 million connections can be handled on a single thread. Therefore, scale
+	  must not be larger than 3 for a single thread. If more connections are needed,
+	  increase NUM_BITS_LCID in nest_types.h and reduce other NUM_BITS_* correspondingly.
+
+    Note: Changing the number of threads for fixed scale will lead to changes in "Total spikes" comparable
+	  to the differences observed for different seeds, since random numbers are distributed differently.
+
+	  Compiling with different compilers (specifically C++ standard libraries with different non-uniform
+	  random number algorithms) will lead to similar changes in "Total spikes".
+
+	  Different implementations of the exp() or expm1() function in different glibc() or hardware architectures
+	  may also lead to different "Total spike" values, see
+
+	      Blanco, W., Lopes, P. H., De S. Souza, A. A., & Mascagni, M. (2020).
+	      Non-replicability circumstances in a neural network model with Hodgkin-Huxley-type neurons.
+	      Journal of Computational Neuroscience, 48(3), 357-363. https://doi.org/10.1007/s10827-020-00748-3
+*/
+
+M_INFO setverbosity
+
+% ************************************************************************** %
+%                                                                            %
+% Parse command line                                                         %
+%                                                                            %
+% ************************************************************************** %
+
+/n_threads 1 def
+/scale 1 def
+/rng_seed 12345 def
+/record true def
+
+/reportfile (cuba_stdp_spec.rpt) def
+
+/t_sim 1000.0 def
+/dt 0.1 def
+
+statusdict /userargs get { (=) breakup } Map
+{
+ arrayload ;
+ /val Set /key Set
+
+ mark
+ key (threads) eq { /n_threads val cvi def } case
+ key (scale) eq { /scale val cvd def } case
+ key (seed) eq { /rng_seed val cvi def } case
+ { /cuda_stdp_spec (Unknown option: ") key join (") join cvlit raiseerror }
+ switchdefault
+}
+forall
+
+%%% PARAMETER SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% define all relevant parameters: changes should be made here
+% all data is place in the userdict dictionary
+
+% A dictionary is a list of name value pairs, enclosed in << and >>
+% Here we use dictionaries to encapsulate the parameters for the different
+% benchmarks
+
+/plastic_brunel_params
+<<
+  /virtual_processes n_threads  % number of virtual processes to use
+  /simtime t_sim % simulated time
+  /dt         dt % simulation step
+
+  /NE 9000 scale mul cvi       % number of excitatory neurons
+  /NI 2250 scale mul cvi       % number of inhibitory neurons
+
+  /model  /iaf_psc_exp  % the neuron model to use
+  /model_params
+   <<
+   % Set variables for iaf_psc_exp
+    /E_L     0.0  mV  % Resting membrane potential [mV]
+    /V_m     0.0  mV  % Initial membrane potential [mV]
+    /V_th   20.0  mV  % Threshold [mV]
+    /V_reset 0.0  mV  % Reset Potential [mV]
+    /C_m   250.0  pF  % Capacity of the membrane [pF]
+    /tau_m  20.0  ms  % Membrane time constant [ms]
+                      % V randomly initialized see below
+   >>
+
+  /mean_potential 7.0 mV
+  /sigma_potential 5.0 mV
+
+  /epsilon 0.1           % Connection probability
+  /delay  1.5 ms         % synaptic delay, static connections [ms]
+  /JE 35.0 pA            % peak amplitude of PSC [pA]
+  /g  5.0                % relative strength of inhib. connections
+
+  /plastic_synapses true
+  /stdp_params
+  <<
+    /delay 1.5 ms
+    /alpha 1.05      %STDP asymmetry parameter
+  >>
+  /sigma_w 3.0       %initial standard dev. of E->E synapses [pA]
+
+  /stimulus /poisson_generator
+  /stimulus_params
+  <<
+    /rate 900.0 4.5 mul Hz % rate of inital poisson stimulus
+  >>
+>> def
+
+% Here we resolve parameter dependencies, by making the independent
+% values visible
+plastic_brunel_params dup using
+<<
+ /E_synapse_params
+  <<
+     /weight JE          % excitatory synaptic conductance
+  >>
+
+  /I_synapse_params
+  <<
+     /weight JE g mul -1.0 mul  % inhibitory synaptic current [pA]
+  >>
+>> join
+
+stdp_params
+<<
+  /weight JE
+  /Wmax 2.0 JE mul       %max strength of E->E synapses [pA]
+>> join
+
+/BuildNetwork
+{
+
+  % set global kernel parameters
+  <<
+     /resolution  dt
+     /total_num_virtual_procs virtual_processes
+     /overwrite_files true
+     /rng_seed rng_seed
+  >> SetKernelStatus
+
+  % normal distribution to draw several quantities from
+  /normal_param << /normal << /mean mean_potential /std sigma_potential >> >> CreateParameter def
+  /v_m_parameter normal_param (-inf) cvd model_params /V_th get redraw def
+
+  model    model_params    SetDefaults
+  /E_neurons model NE Create def
+
+  /I_neurons model NI Create def
+
+  % all neurons
+  /allNeurons E_neurons I_neurons join def
+
+  /E_stimulus stimulus Create def
+  E_stimulus stimulus_params SetStatus
+
+  /I_stimulus stimulus Create def
+   I_stimulus stimulus_params SetStatus
+
+  /CE NE epsilon mul iround def %number of incoming excitatory connections
+  /CI NI epsilon mul iround def %number of incomining inhibitory connections
+
+  allNeurons << /V_m  v_m_parameter >> SetStatus
+
+  % Create custom synapse types with appropriate values for
+  % our excitatory and inhibitory connections
+  /static_synapse << /delay delay >> SetDefaults
+  /static_synapse /syn_ex E_synapse_params CopyModel
+  /static_synapse /syn_in I_synapse_params CopyModel
+  /stdp_synapse stdp_params SetDefaults
+
+  plastic_synapses
+  {
+    /synapse_model /stdp_synapse def % plastic
+  }
+  {
+    /synapse_model /syn_ex def
+  } ifelse
+
+
+  % Connect Poisson generator to neuron
+  E_stimulus E_neurons << /rule /all_to_all >> << /synapse_model /syn_ex >> Connect
+  I_stimulus I_neurons << /rule /all_to_all >> << /synapse_model /syn_ex >> Connect
+
+  /weight_dist << /normal << /mean JE /std sigma_w >> >> CreateParameter def
+  E_neurons E_neurons << /rule /fixed_indegree /indegree CE >> << /synapse_model synapse_model /weight weight_dist >> Connect
+
+  E_neurons I_neurons << /rule /fixed_indegree /indegree CE >> << /synapse_model /syn_ex >> Connect
+
+  I_neurons E_neurons << /rule /fixed_indegree /indegree CI >> << /synapse_model /syn_in >> Connect
+
+  I_neurons I_neurons << /rule /fixed_indegree /indegree CI >> << /synapse_model /syn_in >> Connect
+
+ } def % end of buildnetwork
+
+{
+  ResetKernel
+
+  BuildNetwork
+
+  simtime Simulate
+
+  /ks GetKernelStatus def
+
+  reportfile (w) file
+
+  (Number of threads: ) <- ks /local_num_threads get <- endl
+  (Scale            : ) <- scale <- endl
+  (Network size     : ) <- ks /network_size get <- endl
+  (Num connections  : ) <- ks /num_connections get <- endl
+  (Simulated time   : ) <- t_sim <- ( ms) <- endl
+  (Total spikes     : ) <- ks /local_spike_counter get <- endl
+
+  endl
+  (Time create nodes: ) <- ks /time_construction_create get <- ( s) <- endl
+  (Time connect     : ) <- ks /time_construction_connect get <- ( s) <- endl
+  (Time prepare     : ) <- ks /time_communicate_prepare get <- ( s) <- endl
+  (Time simulate    : ) <- ks /time_simulate get <- ( s) <- endl
+
+  close
+
+  (\nReport written to: ) =only reportfile =
+  () =
+
+} exec
