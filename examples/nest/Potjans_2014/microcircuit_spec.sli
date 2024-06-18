@@ -87,11 +87,6 @@
 */
 
 
-% call like:
-% nest --userargs=$scale,$nvp,$randomweights,$tofile hpc_benchmark_extrae.sli
-
-%
-
 % ************************************************************************** %
 %                                                                            %
 % Parse command line                                                         %
