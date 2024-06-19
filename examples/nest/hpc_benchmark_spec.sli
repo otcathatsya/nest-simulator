@@ -250,6 +250,7 @@ brunel_params dup using
   % set global kernel parameters
   <<
      /total_num_virtual_procs nvp
+     /rng_seed rng_seed
      /resolution  dt
      /overwrite_files true
   >> SetKernelStatus
@@ -340,6 +341,7 @@ RunSimulation
 
   (Number of threads: ) <- ks /local_num_threads get <- endl
   (Scale            : ) <- scale <- endl
+  (Random seed      : ) <- ks /rng_seed get <- endl
   (Network size     : ) <- ks /network_size get <- endl
   (Num connections  : ) <- ks /num_connections get <- endl
   (Simulated time   : ) <- t_sim <- ( ms) <- endl
