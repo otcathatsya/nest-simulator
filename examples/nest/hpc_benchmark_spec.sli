@@ -82,14 +82,17 @@
 	 - Random seed can be set
 	 - Total spike count, timers and som more stats reported in *.rpt file
 	 - Entirely self-contained, does not depend on external files
+	 - By default, set learning rate to 0 to keep weights and dynamics stable;
+	   set plastic=true to use default learning rate 0.1
 	 - Assumes being run on a single MPI process
 	 - No spike recorders, only use local spike counter
+	 - Recording to file can be turned on by option for control
 	 - No output to *.log files
 	 - Presimulation and simulation run by single call to Simulate
 
     Configuration via colon-separated user arguments, where all arguments are optional
 
-    nest --userargs=threads=T:scale=S:seed=R hpc_benchmark_spec.sli
+    nest --userargs=threads=T:scale=S:seed=R:plastic=true/false:record=true/false hpc_benchmark_spec.sli
 
     e.g.
 
@@ -126,7 +129,8 @@ M_INFO setverbosity
 /n_threads 1 def
 /scale 1 def
 /rng_seed 12345 def
-/record true def
+/record false def
+/plastic false def
 
 /reportfile (hpc_benchmark_spec.rpt) def
 
@@ -139,6 +143,8 @@ statusdict /userargs get { (=) breakup } Map
  key (threads) eq { /n_threads val cvi def } case
  key (scale) eq { /scale val cvd def } case
  key (seed) eq { /rng_seed val cvi def } case
+ key (record) eq { /record val (true) eq def } case
+ key (plastic) eq { /plastic val (true) eq def } case
  { /hpc_benchmark_spec (Unknown option: ") key join (") join cvlit raiseerror }
  switchdefault
 }
@@ -229,7 +235,7 @@ def
   <<
     /delay 1.5 ms
     /alpha  0.0513
-    /lambda 0.1           % STDP step size
+    /lambda plastic { 0.1 } { 0.0 } ifelse           % STDP step size
     /mu     0.4           % STDP weight dependence exponent (potentiation)
     /tau_plus 15.0        % time constant for potentiation
   >>
@@ -272,6 +278,11 @@ brunel_params dup using
 
   /CE NE scale cvd div iround def % number of incoming excitatory connections
   /CI NI scale cvd div iround def % number of incoming inhibitory connections
+
+  record {
+    /sr /spike_recorder << /record_to /ascii >> Create def
+  }
+  if
 
   model_params using
 
@@ -318,6 +329,11 @@ brunel_params dup using
   I_neurons I_neurons << /rule (fixed_indegree) /indegree CI /allow_autapses false /allow_multapses true >>
                       << /synapse_model /syn_in >> Connect
 
+  record {
+    E_neurons I_neurons join sr Connect
+  }
+  if
+
  } def % end of buildnetwork
 
 %-------------------------- Simulation -----------------------------------------
@@ -342,6 +358,7 @@ RunSimulation
   (Number of threads: ) <- ks /local_num_threads get <- endl
   (Scale            : ) <- scale <- endl
   (Random seed      : ) <- ks /rng_seed get <- endl
+  (Plastic          : ) <- plastic <- endl
   (Network size     : ) <- ks /network_size get <- endl
   (Num connections  : ) <- ks /num_connections get <- endl
   (Simulated time   : ) <- t_sim <- ( ms) <- endl
