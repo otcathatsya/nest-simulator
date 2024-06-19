@@ -342,7 +342,7 @@ RunSimulation
   (Scale            : ) <- scale <- endl
   (Network size     : ) <- ks /network_size get <- endl
   (Num connections  : ) <- ks /num_connections get <- endl
-  (Simulated time   : ) <- t_sim add <- ( ms) <- endl
+  (Simulated time   : ) <- t_sim <- ( ms) <- endl
   (Total spikes     : ) <- ks /local_spike_counter get <- endl
   (Average rate     : ) <- ks /local_spike_counter get cvd NE NI add cvd div t_sim div 1000 mul <- ( sp/s) <- endl
 
