@@ -763,7 +763,7 @@ public:
    * return the Kminus value at t (in ms).
    * @throws UnexpectedEvent
    */
-  virtual double get_K_value( size_t t, size_t& dt_steps );
+  virtual double get_K_value( long t, size_t& dt_steps );
 
   virtual double get_K_value (double );
 
@@ -781,8 +781,8 @@ public:
    * return the spike history for (t1,t2].
    * @throws UnexpectedEvent
    */
-  virtual void get_history( size_t t1,
-    size_t t2,
+  virtual void get_history( long t1,
+    long t2,
     std::deque< histentry >::iterator* start,
     std::deque< histentry >::iterator* finish );
 

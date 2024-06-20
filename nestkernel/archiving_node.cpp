@@ -92,7 +92,7 @@ ArchivingNode::register_stdp_connection( size_t t_first_read, size_t delay, cons
 }
 
 double
-nest::ArchivingNode::get_K_value( size_t t, size_t& dt_steps )
+nest::ArchivingNode::get_K_value( long t, size_t& dt_steps )
 {
   dt_steps = 0;
   // case when the neuron has not yet spiked
@@ -107,7 +107,7 @@ nest::ArchivingNode::get_K_value( size_t t, size_t& dt_steps )
   while ( i >= 0 )
   {
     const auto hist = history_[ i ];
-    if ( t > hist.t_ )
+    if ( t > static_cast< long >( hist.t_ ) )
     {
       trace_ = hist.Kminus_;
       dt_steps = t - hist.t_;
@@ -143,7 +143,7 @@ nest::ArchivingNode::get_K_values( double t,
   int i = history_.size() - 1;
   while ( i >= 0 )
   {
-    if ( t - history_[ i ].t_ > 0 )
+    if ( t - history_[ i ].t_ > kernel().connection_manager.get_stdp_eps() )
     {
       K_triplet_value =
         ( history_[ i ].Kminus_triplet_ * std::exp( ( history_[ i ].t_ - t ) * tau_minus_triplet_inv_ ) );
@@ -162,8 +162,8 @@ nest::ArchivingNode::get_K_values( double t,
 }
 
 void
-nest::ArchivingNode::get_history( size_t t1,
-  size_t t2,
+nest::ArchivingNode::get_history( long t1,
+  long t2,
   std::deque< histentry >::iterator* start,
   std::deque< histentry >::iterator* finish )
 {
@@ -174,13 +174,13 @@ nest::ArchivingNode::get_history( size_t t1,
     return;
   }
   std::deque< histentry >::reverse_iterator runner = history_.rbegin();
-  while ( runner != history_.rend() and runner->t_ > t2 )
+  while ( runner != history_.rend() and static_cast< long >( runner->t_ ) > t2 )
   {
     ++runner;
   }
 
   *finish = runner.base();
-  while ( runner != history_.rend() and runner->t_ > t1 )
+  while ( runner != history_.rend() and static_cast< long >( runner->t_ ) > t1 )
   {
     runner->access_counter_++;
     ++runner;

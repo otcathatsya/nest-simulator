@@ -474,7 +474,7 @@ Node::get_LTD_value( double )
 }
 
 double
-Node::get_K_value( size_t, size_t& )
+Node::get_K_value( long, size_t& )
 {
   throw UnexpectedEvent();
 }
@@ -492,7 +492,7 @@ Node::get_K_values( double, double&, double&, double& )
 }
 
 void
-nest::Node::get_history( size_t, size_t, std::deque< histentry >::iterator*, std::deque< histentry >::iterator* )
+nest::Node::get_history( long, long, std::deque< histentry >::iterator*, std::deque< histentry >::iterator* )
 {
   throw UnexpectedEvent();
 }

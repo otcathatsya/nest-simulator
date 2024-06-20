@@ -59,7 +59,7 @@ public:
    * When the trace is requested at the exact same time that the neuron emits a spike,
    * the trace value as it was just before the spike is returned.
    */
-  double get_K_value( size_t t, size_t& dt_steps ) override;
+  double get_K_value( long t, size_t& dt_steps ) override;
 
   /**
    * Write the different STDP K values at time t (in ms) to the provided locations.
@@ -81,8 +81,8 @@ public:
   /**
    * Return the spike times (in steps) of spikes which occurred in the range [t1,t2].
    */
-  void get_history( size_t t1,
-    size_t t2,
+  void get_history( long t1,
+    long t2,
     std::deque< histentry >::iterator* start,
     std::deque< histentry >::iterator* finish ) override;
 

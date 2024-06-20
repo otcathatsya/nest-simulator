@@ -140,7 +140,7 @@ public:
 inline double
 STDPPLHomCommonProperties::get_exp_tau_plus( const long dt_steps ) const
 {
-  if ( static_cast<size_t>(dt_steps) < exp_tau_plus_.size() )
+  if ( static_cast< size_t >( dt_steps ) < exp_tau_plus_.size() )
   {
     return exp_tau_plus_[ dt_steps ];
   }
@@ -153,7 +153,7 @@ STDPPLHomCommonProperties::get_exp_tau_plus( const long dt_steps ) const
 inline double
 STDPPLHomCommonProperties::get_exp_tau_minus( const long dt_steps ) const
 {
-  if ( static_cast<size_t>(dt_steps) < exp_tau_minus_.size() )
+  if ( static_cast< size_t >( dt_steps ) < exp_tau_minus_.size() )
   {
     return exp_tau_minus_[ dt_steps ];
   }
@@ -279,7 +279,7 @@ private:
   // data members of each connection
   double weight_;
   double Kplus_;
-  size_t t_lastspike_;
+  long t_lastspike_;
 };
 
 template < typename targetidentifierT >
@@ -300,13 +300,13 @@ stdp_pl_synapse_hom< targetidentifierT >::send( Event& e, size_t t, const STDPPL
 {
   // synapse STDP depressing/facilitation dynamics
 
-  const size_t t_spike = e.get_stamp().get_steps();
+  const long t_spike = e.get_stamp().get_steps();
 
   // t_lastspike_ = 0 initially
 
   Node* target = get_target( t );
 
-  size_t dendritic_delay = get_delay_steps();
+  const long dendritic_delay = get_delay_steps();
 
   // get spike history in relevant range (t1, t2] from postsynaptic neuron
   std::deque< histentry >::iterator start;
@@ -317,9 +317,6 @@ stdp_pl_synapse_hom< targetidentifierT >::send( Event& e, size_t t, const STDPPL
   size_t dt;
   while ( start != finish )
   {
-    // print start and finish along with the current t
-    //std::cout << "t: " << t << " start: " << start->t_ << " finish: " << finish->t_ << std::endl;
-    // print start and finish in one line
     dt = ( start->t_ + dendritic_delay ) - t_lastspike_;
     start++;
     // get_history() should make sure that
