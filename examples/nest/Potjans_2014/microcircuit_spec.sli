@@ -518,15 +518,19 @@ ConnectNetworkNodes
 t_sim Simulate
 
 /ks GetKernelStatus def
+/tot_n_neurons n_neurons Flatten Total def
 
 reportfile (w) file
 
 (Number of threads: ) <- ks /local_num_threads get <- endl
 (Scale            : ) <- scale <- endl
+(Random seed      : ) <- ks /rng_seed get <- endl
 (Network size     : ) <- ks /network_size get <- endl
 (Num connections  : ) <- ks /num_connections get <- endl
 (Simulated time   : ) <- t_sim <- ( ms) <- endl
 (Total spikes     : ) <- ks /local_spike_counter get <- endl
+(Average rate     : ) <- ks /local_spike_counter get cvd tot_n_neurons cvd div t_sim div 1000 mul <- ( sp/s) <- endl
+
 record
 {
   (Population spikes: ) <-

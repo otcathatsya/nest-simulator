@@ -277,10 +277,12 @@ stdp_params
 
   (Number of threads: ) <- ks /local_num_threads get <- endl
   (Scale            : ) <- scale <- endl
+  (Random seed      : ) <- ks /rng_seed get <- endl
   (Network size     : ) <- ks /network_size get <- endl
   (Num connections  : ) <- ks /num_connections get <- endl
   (Simulated time   : ) <- t_sim <- ( ms) <- endl
   (Total spikes     : ) <- ks /local_spike_counter get <- endl
+  (Average rate     : ) <- ks /local_spike_counter get cvd NE NI add cvd div simtime div 1000 mul <- ( sp/s) <- endl
 
   endl
   (Time create nodes: ) <- ks /time_construction_create get <- ( s) <- endl
