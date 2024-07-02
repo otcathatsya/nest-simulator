@@ -479,9 +479,15 @@ public:
    * @throws IllegalConnection
    *
    */
-  virtual void register_stdp_connection( size_t, size_t, const double tau_minus );
-
   virtual void register_stdp_connection( double, double );
+
+  /**
+   * Register a homogenous STDP connection
+   *
+   * @throws IllegalConnection
+   *
+   */
+  virtual void register_stdp_connection( double, double, const double tau_minus );
 
   /**
    * Initialize the update history and register the eprop synapse.
@@ -763,9 +769,13 @@ public:
    * return the Kminus value at t (in ms).
    * @throws UnexpectedEvent
    */
-  virtual double get_K_value( long t, size_t& dt_steps );
-
   virtual double get_K_value (double );
+
+  /**
+   * return the Kminus value at t (in ms) as well as the time delta in ms written to dt.
+   * @throws UnexpectedEvent
+   */
+  virtual double get_K_value( double t, double& dt );
 
   virtual double get_LTD_value( double t );
 
@@ -781,11 +791,6 @@ public:
    * return the spike history for (t1,t2].
    * @throws UnexpectedEvent
    */
-  virtual void get_history( long t1,
-    long t2,
-    std::deque< histentry >::iterator* start,
-    std::deque< histentry >::iterator* finish );
-
   virtual void get_history( double t1,
     double t2,
     std::deque< histentry >::iterator* start,

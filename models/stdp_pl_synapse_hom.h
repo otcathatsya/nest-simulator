@@ -25,7 +25,6 @@
 
 // C++ includes:
 #include <cmath>
-#include <iomanip>
 
 // Includes from nestkernel:
 #include "connection.h"
@@ -119,8 +118,8 @@ public:
   void init_exp_tau_plus();
   void init_exp_tau_minus();
 
-  double get_exp_tau_plus( const long dt_steps ) const;
-  double get_exp_tau_minus( const long dt_steps ) const;
+  double get_exp_tau_plus( const double dt ) const;
+  double get_exp_tau_minus( const double dt ) const;
 
   // data members common to all connections
   double tau_plus_;
@@ -138,8 +137,10 @@ public:
 };
 
 inline double
-STDPPLHomCommonProperties::get_exp_tau_plus( const long dt_steps ) const
+STDPPLHomCommonProperties::get_exp_tau_plus( const double dt ) const
 {
+  const auto dt_steps = Time( Time::ms( dt ) ).get_steps();
+
   if ( static_cast< size_t >( dt_steps ) < exp_tau_plus_.size() )
   {
     return exp_tau_plus_[ dt_steps ];
@@ -151,8 +152,10 @@ STDPPLHomCommonProperties::get_exp_tau_plus( const long dt_steps ) const
 }
 
 inline double
-STDPPLHomCommonProperties::get_exp_tau_minus( const long dt_steps ) const
+STDPPLHomCommonProperties::get_exp_tau_minus( const double dt ) const
 {
+  const auto dt_steps = Time( Time::ms( dt ) ).get_steps();
+
   if ( static_cast< size_t >( dt_steps ) < exp_tau_minus_.size() )
   {
     return exp_tau_minus_[ dt_steps ];
@@ -253,7 +256,7 @@ public:
 
     ConnectionBase::check_connection_( dummy_target, s, t, receptor_type );
 
-    t.register_stdp_connection( t_lastspike_ - get_delay_steps(), get_delay_steps(), cp.tau_minus_ );
+    t.register_stdp_connection( t_lastspike_ - get_delay(), get_delay(), cp.tau_minus_ );
   }
 
   void
@@ -279,7 +282,7 @@ private:
   // data members of each connection
   double weight_;
   double Kplus_;
-  long t_lastspike_;
+  double t_lastspike_;
 };
 
 template < typename targetidentifierT >
@@ -300,13 +303,13 @@ stdp_pl_synapse_hom< targetidentifierT >::send( Event& e, size_t t, const STDPPL
 {
   // synapse STDP depressing/facilitation dynamics
 
-  const long t_spike = e.get_stamp().get_steps();
+  const double t_spike = e.get_stamp().get_ms();
 
   // t_lastspike_ = 0 initially
 
   Node* target = get_target( t );
 
-  const long dendritic_delay = get_delay_steps();
+  const double dendritic_delay = get_delay();
 
   // get spike history in relevant range (t1, t2] from postsynaptic neuron
   std::deque< histentry >::iterator start;
@@ -314,7 +317,7 @@ stdp_pl_synapse_hom< targetidentifierT >::send( Event& e, size_t t, const STDPPL
   target->get_history( t_lastspike_ - dendritic_delay, t_spike - dendritic_delay, &start, &finish );
 
   // facilitation due to postsynaptic spikes since last pre-synaptic spike
-  size_t dt;
+  double dt;
   while ( start != finish )
   {
     dt = ( start->t_ + dendritic_delay ) - t_lastspike_;
@@ -348,7 +351,7 @@ stdp_pl_synapse_hom< targetidentifierT >::stdp_pl_synapse_hom()
   : ConnectionBase()
   , weight_( 1.0 )
   , Kplus_( 0.0 )
-  , t_lastspike_( 0 )
+  , t_lastspike_( 0.0 )
 {
 }
 
