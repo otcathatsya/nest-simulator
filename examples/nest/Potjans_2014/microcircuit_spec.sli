@@ -369,6 +369,8 @@ forall
 
                         % Connect the populations
                         source_nodes target_nodes conn_dict syn_dict Connect
+                        (Debug Num Connections: ) =only GetKernelStatus /num_connections get =
+
 
                     } if % n_synapses > 0
 	        } for % source population
