@@ -100,6 +100,10 @@ STDPPLHomCommonProperties::set_status( const DictionaryDatum& d, ConnectorModel&
   updateValue< double >( d, names::mu, mu_ );
 }
 
+thread_local std::vector< double > STDPPLHomCommonProperties::exp_tau_plus_;
+thread_local std::vector< double > STDPPLHomCommonProperties::exp_tau_minus_;
+
+
 void
 STDPPLHomCommonProperties::init_exp_tau_plus()
 {

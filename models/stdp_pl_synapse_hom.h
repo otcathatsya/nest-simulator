@@ -134,8 +134,8 @@ public:
 
   // look up table for the exponentials
   // exp( -dt / tau_plus ) and exp( -dt / tau_minus )
-  std::vector< double > exp_tau_plus_;
-  std::vector< double > exp_tau_minus_;
+  static thread_local std::vector< double > exp_tau_plus_;
+  static thread_local std::vector< double > exp_tau_minus_;
 };
 
 inline double
